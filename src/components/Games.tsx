@@ -1,27 +1,30 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 type Game = {
   id: number;
   name: string;
   rating?: number;
-  genres?: { id: number; name: string }[];
-  background_image?: string;
+  genre?: string;
+  year: number;
+  image?: string;
+  adult_only?: boolean;
+  screenshots?: [];
 };
 
 type GameResponse = {
   results: Game[];
-}
+};
 
 const Games = () => {
   const [InputValue, setInputValue] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState<string>("");
 
   const fetchGames = async (): Promise<GameResponse> => {
-    
-    const url = searchTerm ? `http://localhost:5000/games?search=${searchTerm}` : `
+    const url = searchTerm
+      ? `http://localhost:5000/games?search=${searchTerm}`
+      : `
     http://localhost:5000/games`;
-
 
     const res = await fetch(url);
     if (!res.ok) throw new Error("Network Response was not okay");
@@ -61,11 +64,44 @@ const Games = () => {
 
       {/* Content Section */}
       <div className="w-full max-w-6xl">
-        <div className="text-gray-400 text-lg">
+        <div className=" text-lg grid lg:grid-cols-4 md:grid-cols-3 sm:grid-cols-2 gap-16">
           {data?.results?.length ? (
             data.results.map((game) => (
-              <div key={game.id}>
-                <p>{game.name}</p>
+              <div
+                key={game.id}
+                className="relative rounded-xl overflow-hidden group cursor-pointer bg-gray-900 border border-white/10 hover:border-yellow-400/40 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl"
+              >
+                <img
+                  src={game.image}
+                  alt={game.name}
+                  className="w-full h-72 object-cover brightness-75 group-hover:brightness-50 group-hover:scale-105 transition-all duration-300"
+                />
+                <div className="absolute inset-0 bg-linear-to-t from-black/90 via-black/40 to-transparent" />
+                {game.adult_only && (
+                  <span className="absolute top-2 right-2 text-[10px] font-bold uppercase tracking-widest bg-red-500 text-white px-2 py-0.5 rounded">
+                    18+
+                  </span>
+                )}
+                <div className="absolute bottom-0 left-0 right-0 p-3 flex flex-col gap-1.5">
+                  <p className="text-white font-semibold text-sm leading-tight">
+                    {game.name}
+                  </p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {game.genre && (
+                      <span className="text-[10px] uppercase tracking-widest text-yellow-400 bg-yellow-400/10 border border-yellow-400/25 px-2 py-0.5 rounded">
+                        {game.genre}
+                      </span>
+                    )}
+                    <span className="text-[11px] text-gray-400">
+                      {game.year}
+                    </span>
+                  </div>
+                  {game.rating != null && (
+                    <p className="text-yellow-400 text-xs font-medium">
+                      ★ {game.rating}
+                    </p>
+                  )}
+                </div>
               </div>
             ))
           ) : (
