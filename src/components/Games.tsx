@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { Spinner } from "./ui/spinner";
 
 type Game = {
   id: number;
@@ -12,24 +13,33 @@ type Game = {
   screenshots?: [];
 };
 
-type GameResponse = {
-  results: Game[];
-};
-
 const Games = () => {
   const [InputValue, setInputValue] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState<string>("");
 
-  const fetchGames = async (): Promise<GameResponse> => {
+  const fetchGames = async (): Promise<Game[]> => {              
     const url = searchTerm
       ? `http://localhost:5000/games?search=${searchTerm}`
-      : `
-    http://localhost:5000/games`;
+      : `http://localhost:5000/games`;                           
 
     const res = await fetch(url);
     if (!res.ok) throw new Error("Network Response was not okay");
     const data = await res.json();
-    return data;
+
+    return data.map((g: any) => ({
+      id: g.id,
+      name: g.name,
+      rating: g.rating ? parseFloat((g.rating / 10).toFixed(1)) : undefined,
+      genre: g.genres?.[0]?.name,
+      year: g.first_release_date
+        ? new Date(g.first_release_date * 1000).getFullYear()
+        : 0,
+      image: g.cover?.url?.replace("t_thumb", "t_cover_big"),
+      adult_only: g.age_ratings?.some((r: { rating: number; }) => r.rating >= 5),
+      screenshots: g.screenshots?.map((s: {url: string}) =>
+        s.url.replace("t_thumb", "t_screenshot_big")
+      ),
+    }));
   };
 
   const { data, isLoading, error } = useQuery({
@@ -37,7 +47,7 @@ const Games = () => {
     queryFn: fetchGames,
   });
 
-  if (isLoading) return <p>Loading...</p>;
+  if (isLoading) return <Spinner className="text-center justify-center size-16 m-auto"/>
   if (error instanceof Error) return <p>Error...{error.message}</p>;
 
   return (
@@ -45,7 +55,6 @@ const Games = () => {
       {/* Search Section */}
       <div className="w-full max-w-4xl flex items-center gap-6">
         <p className="text-lg font-semibold whitespace-nowrap">Search here</p>
-
         <input
           className="flex-1 p-3 rounded-xl bg-zinc-900 border border-zinc-700 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
           type="text"
@@ -53,9 +62,8 @@ const Games = () => {
           onChange={(e) => setInputValue(e.target.value)}
           placeholder="Red Dead Redemption..."
         />
-
         <button
-          onClick={() => setSearchTerm(InputValue)} // 🔥 trigger search
+          onClick={() => setSearchTerm(InputValue)}
           className="p-2 cursor-pointer text-white bg-black rounded-xl"
         >
           Search
@@ -64,9 +72,9 @@ const Games = () => {
 
       {/* Content Section */}
       <div className="w-full max-w-6xl">
-        <div className=" text-lg grid lg:grid-cols-4 md:grid-cols-3 sm:grid-cols-2 gap-16">
-          {data?.results?.length ? (
-            data.results.map((game) => (
+        <div className="text-lg grid lg:grid-cols-4 md:grid-cols-3 sm:grid-cols-2 gap-16">
+          {data?.length ? (
+            data.map((game) => (
               <div
                 key={game.id}
                 className="relative rounded-xl overflow-hidden group cursor-pointer bg-gray-900 border border-white/10 hover:border-yellow-400/40 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl"
@@ -92,9 +100,7 @@ const Games = () => {
                         {game.genre}
                       </span>
                     )}
-                    <span className="text-[11px] text-gray-400">
-                      {game.year}
-                    </span>
+                    <span className="text-[11px] text-gray-400">{game.year}</span>
                   </div>
                   {game.rating != null && (
                     <p className="text-yellow-400 text-xs font-medium">
@@ -105,7 +111,7 @@ const Games = () => {
               </div>
             ))
           ) : (
-            <p>Nothing to show here</p>
+            <p className="text-red-500 text-3xl">No games to show at the momemt, please try again later!</p>
           )}
         </div>
       </div>
