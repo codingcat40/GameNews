@@ -26,6 +26,27 @@ const getAccessToken = async () => {
 
 app.get("/games", async (req, res) => {         
     const token = await getAccessToken();
+    const search = req.query.search;
+    const page = parseInt(req.query.page) || 1;
+    const limit = 20;
+    const offset = (page - 1) * limit;
+
+    const body = search
+    ? `
+        fields name, rating, genres.name, first_release_date, cover.url, age_ratings.rating, screenshots.url;
+        search "${search}";
+        where cover != null;
+        limit ${limit};
+        offset ${offset};
+      `
+    : `
+        fields name, rating, genres.name, first_release_date, cover.url, age_ratings.rating, screenshots.url;
+        where rating > 75 & cover != null;
+        sort rating desc;
+        limit ${limit};
+        offset ${offset};
+      `;
+
 
     const igdbRes = await fetch("https://api.igdb.com/v4/games", {
         method: "POST",
@@ -34,16 +55,11 @@ app.get("/games", async (req, res) => {
             Authorization: `Bearer ${token}`,
             "Content-Type": "text/plain",        
         },
-        body: `
-          fields name, rating, genres.name, first_release_date, cover.url, age_ratings.rating, screenshots.url;
-          where rating > 75 & cover != null;
-          sort rating desc;
-          limit 20;
-        `
+        body,
     });
 
     const raw = await igdbRes.json();
-    res.json(raw);                             
+    res.json({results: raw, page, totalPages: 30});                             
 });
 
 app.listen(5000, () => console.log("Server running on port 5000"));

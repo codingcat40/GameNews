@@ -2,52 +2,54 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Spinner } from "./ui/spinner";
 
+import { useDebounce } from "use-debounce";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "./ui/pagination";
+
 type Game = {
   id: number;
   name: string;
   rating?: number;
-  genre?: string;
-  year: number;
-  image?: string;
-  adult_only?: boolean;
-  screenshots?: [];
+  genres?: { id: number; name: string }[];
+  first_release_date?: number;
+  cover?: { id: number; url: string };
+  age_ratings?: { id: number; rating: number; category: number }[];
+  screenshots?: { id: number; url: string }[];
 };
 
 const Games = () => {
   const [InputValue, setInputValue] = useState<string>("");
-  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [searchTerm] = useDebounce(InputValue, 1000);
+  const [page, setPage] = useState(1);
 
-  const fetchGames = async (): Promise<Game[]> => {              
+  const fetchGames = async (): Promise<{
+    results: Game[];
+    totalPages: number;
+  }> => {
     const url = searchTerm
-      ? `http://localhost:5000/games?search=${searchTerm}`
-      : `http://localhost:5000/games`;                           
+  ? `http://localhost:5000/games?search=${searchTerm}`
+  : `http://localhost:5000/games?page=${page}`;
 
     const res = await fetch(url);
     if (!res.ok) throw new Error("Network Response was not okay");
     const data = await res.json();
-
-    return data.map((g: any) => ({
-      id: g.id,
-      name: g.name,
-      rating: g.rating ? parseFloat((g.rating / 10).toFixed(1)) : undefined,
-      genre: g.genres?.[0]?.name,
-      year: g.first_release_date
-        ? new Date(g.first_release_date * 1000).getFullYear()
-        : 0,
-      image: g.cover?.url?.replace("t_thumb", "t_cover_big"),
-      adult_only: g.age_ratings?.some((r: { rating: number; }) => r.rating >= 5),
-      screenshots: g.screenshots?.map((s: {url: string}) =>
-        s.url.replace("t_thumb", "t_screenshot_big")
-      ),
-    }));
+    console.log(data);
+    return data;
   };
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["games", searchTerm],
+    queryKey: ["games", searchTerm, page],
     queryFn: fetchGames,
   });
 
-  if (isLoading) return <Spinner className="text-center justify-center size-16 m-auto"/>
+  if (isLoading)
+    return <Spinner className="text-center justify-center size-16 m-auto" />;
   if (error instanceof Error) return <p>Error...{error.message}</p>;
 
   return (
@@ -62,59 +64,91 @@ const Games = () => {
           onChange={(e) => setInputValue(e.target.value)}
           placeholder="Red Dead Redemption..."
         />
-        <button
-          onClick={() => setSearchTerm(InputValue)}
-          className="p-2 cursor-pointer text-white bg-black rounded-xl"
-        >
-          Search
-        </button>
       </div>
 
       {/* Content Section */}
       <div className="w-full max-w-6xl">
         <div className="text-lg grid lg:grid-cols-4 md:grid-cols-3 sm:grid-cols-2 gap-16">
-          {data?.length ? (
-            data.map((game) => (
+          {data?.results?.length ? (
+            data.results.map((game) => (
               <div
                 key={game.id}
                 className="relative rounded-xl overflow-hidden group cursor-pointer bg-gray-900 border border-white/10 hover:border-yellow-400/40 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl"
               >
                 <img
-                  src={game.image}
+                  src={game.cover?.url?.replace("t_thumb", "t_cover_big")}
                   alt={game.name}
-                  className="w-full h-72 object-cover brightness-75 group-hover:brightness-50 group-hover:scale-105 transition-all duration-300"
+                  className="w-full h-72 object-cover"
                 />
-                <div className="absolute inset-0 bg-linear-to-t from-black/90 via-black/40 to-transparent" />
-                {game.adult_only && (
-                  <span className="absolute top-2 right-2 text-[10px] font-bold uppercase tracking-widest bg-red-500 text-white px-2 py-0.5 rounded">
-                    18+
+                {game.age_ratings?.some((r) => r.rating >= 5) && (
+                  <span className="absolute top-2 right-2 ...">18+</span>
+                )}
+                <p className="text-white font-semibold text-sm">{game.name}</p>
+                {game.genres?.[0]?.name && (
+                  <span className="text-yellow-400 ...">
+                    {game.genres[0].name}
                   </span>
                 )}
-                <div className="absolute bottom-0 left-0 right-0 p-3 flex flex-col gap-1.5">
-                  <p className="text-white font-semibold text-sm leading-tight">
-                    {game.name}
+                <span className="text-gray-400">
+                  {game.first_release_date
+                    ? new Date(game.first_release_date * 1000).getFullYear()
+                    : "N/A"}
+                </span>
+                {game.rating != null && (
+                  <p className="text-yellow-400 text-xs font-medium">
+                    ★ {(game.rating / 10).toFixed(1)}
                   </p>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {game.genre && (
-                      <span className="text-[10px] uppercase tracking-widest text-yellow-400 bg-yellow-400/10 border border-yellow-400/25 px-2 py-0.5 rounded">
-                        {game.genre}
-                      </span>
-                    )}
-                    <span className="text-[11px] text-gray-400">{game.year}</span>
-                  </div>
-                  {game.rating != null && (
-                    <p className="text-yellow-400 text-xs font-medium">
-                      ★ {game.rating}
-                    </p>
-                  )}
-                </div>
+                )}
               </div>
             ))
           ) : (
-            <p className="text-red-500 text-3xl">No games to show at the momemt, please try again later!</p>
+            <p className="text-red-500 text-3xl">
+              No games to show at the momemt, please try again later!
+            </p>
           )}
         </div>
       </div>
+
+      <Pagination>
+        <PaginationContent>
+          <PaginationItem>
+            <PaginationPrevious
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              className={
+                page === 1 ? "pointer-events-none opacity-50 p-2" : "cursor-pointer p-2"
+              }
+              size={8}
+            />
+          </PaginationItem>
+
+          {Array.from({ length: data?.totalPages ?? 0 }).map((_, i) => (
+            <PaginationItem key={i}>
+              <PaginationLink
+                onClick={() => setPage(i + 1)}
+                isActive={page === i + 1}
+                className="cursor-pointer p-2"
+                size={8}
+              >
+                {i + 1}
+              </PaginationLink>
+            </PaginationItem>
+          ))}
+
+          <PaginationItem>
+            <PaginationNext
+              onClick={() =>
+                setPage((p) => Math.min(data?.totalPages ?? 1, p + 1))
+              }
+              className={
+                page === data?.totalPages
+                  ? "pointer-events-none opacity-50 p-2"
+                  : "cursor-pointer p-2"
+              }
+              size={8}
+            />
+          </PaginationItem>
+        </PaginationContent>
+      </Pagination>
     </div>
   );
 };
